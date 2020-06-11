@@ -58,7 +58,39 @@ DELETE FROM survey_run;
 DELETE FROM survey_question;
 DELETE FROM survey_template;
 
+/*
+ * Waltz - Enterprise Architecture
+ * Copyright (C) 2016, 2017, 2018, 2019 Waltz open source project
+ * See README.md for more information
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific
+ *
+ */
+
 --[FLOWS]---
+
+-- produce graphviz like output for set of phys flows by assoc tag:
+--   prefix with `digraph G { rankdir=LR;`
+select distinct(concat('"', sa.name, '" -> "', ta.name, '"'))
+from physical_flow pf
+inner join logical_flow lf on pf.logical_flow_id = lf.id
+inner join application sa on sa.id = lf.source_entity_id
+inner join application ta on ta.id = lf.target_entity_id
+inner join tag_usage tu on tu.entity_id = pf.id and tu.entity_kind = 'PHYSICAL_FLOW'
+inner join tag t on t.id = tu.tag_id
+where t.target_kind = 'PHYSICAL_FLOW';
+--   postfix with `}`
+
+
 -- find deleted logical flows which still have remaining physical flows
 select distinct
 	aSource.name,

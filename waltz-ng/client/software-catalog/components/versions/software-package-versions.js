@@ -1,25 +1,26 @@
 /*
  * Waltz - Enterprise Architecture
- * Copyright (C) 2016, 2017, 2018, 2019  Waltz open source project
+ * Copyright (C) 2016, 2017, 2018, 2019 Waltz open source project
  * See README.md for more information
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific
+ *
  */
 
 import _ from "lodash";
-import { CORE_API } from "../../../common/services/core-api-utils";
-import { initialiseData } from "../../../common";
+import {CORE_API} from "../../../common/services/core-api-utils";
+import {initialiseData} from "../../../common";
+import {countByVersionId} from "../../software-catalog-utilities";
+import {mkSelectionOptions} from "../../../common/selector-utils";
 
 import template from "./software-package-versions.html";
 
@@ -31,7 +32,8 @@ const bindings = {
 
 const initialState = {
     softwareCatalog: null,
-    softwarePackage: null
+    softwarePackage: null,
+    selectedVersion: null
 };
 
 
@@ -39,15 +41,18 @@ function mkColumnDefs() {
     return [
         {
             field: "version",
-            name: "Version",
+            displayName: "Version",
+            cellTemplate: `
+                <div class="ui-grid-cell-contents">
+                    <waltz-entity-link entity-ref="row.entity"
+                                       tooltip-placement="right"
+                                       icon-placement="none">
+                    </waltz-entity-link>
+                </div>`
         },
         {
             field: "externalId",
             name: "External Id",
-        },
-        {
-            field: "description",
-            name: "Description",
         },
         {
             field: "releaseDate",
@@ -59,23 +64,26 @@ function mkColumnDefs() {
         },
         {
             field: "usageCount",
-            name: "# Applications"
+            name: "# Applications",
+            cellTemplate: `<div class="ui-grid-cell-contents">
+                               <a class="clickable"
+                                  ng-bind="COL_FIELD"
+                                  ng-click="grid.appScope.onSelectVersion(row.entity)">
+                               </a>
+                           </div>`
         }
     ];
 }
 
 
 function mkGridData(softwarePackage = {}, versions = [], usages = []) {
-    const usagesByVersionId = _.groupBy(usages, "softwareVersionId");
-
+    const countsByVersionId = countByVersionId(usages);
     const gridData = _.map(versions, v => Object.assign(
         {},
         v,
-        {usageCount: _.get(usagesByVersionId, `[${v.id}].length`, 0)}));
-
+        {usageCount: _.get(countsByVersionId, `[${v.id}]`, 0) }));
     return gridData;
 }
-
 
 
 function controller(serviceBroker) {
@@ -92,8 +100,19 @@ function controller(serviceBroker) {
 
                 vm.columnDefs = mkColumnDefs();
                 vm.gridData = mkGridData(vm.softwarePackage,
-                    vm.softwareCatalog.versions,
-                    vm.softwareCatalog.usages);
+                                         vm.softwareCatalog.versions,
+                                         vm.softwareCatalog.usages);
+            });
+    };
+
+
+    vm.onSelectVersion = (version) => {
+        vm.selectedVersion = version;
+        serviceBroker
+            .loadViewData(CORE_API.ApplicationStore.findBySelector, [mkSelectionOptions(version)])
+            .then(r => r.data)
+            .then(apps => {
+                vm.selectedApps = apps;
             });
     };
 

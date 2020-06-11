@@ -1,7 +1,26 @@
+/*
+ * Waltz - Enterprise Architecture
+ * Copyright (C) 2016, 2017, 2018, 2019 Waltz open source project
+ * See README.md for more information
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific
+ *
+ */
+
 package com.khartec.waltz.web;
 
 import com.khartec.waltz.web.endpoints.Endpoint;
-import com.khartec.waltz.web.endpoints.extracts.BaseDataExtractor;
+import com.khartec.waltz.web.endpoints.extracts.DataExtractor;
+import com.khartec.waltz.web.endpoints.extracts.DirectQueryBasedDataExtractor;
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.Test;
 import org.springframework.stereotype.Service;
@@ -39,9 +58,9 @@ public class EndpointArchitectureCompliance extends BaseArchitectureComplianceCh
     @Test
     public void extractorsNeedServiceAnnotation() {
         ArchRule rule = classes().that()
-                .areAssignableTo(BaseDataExtractor.class)
+                .areAssignableTo(DataExtractor.class)
                 .and()
-                .dontHaveSimpleName("BaseDataExtractor")
+                .dontHaveSimpleName("DataExtractor")
                 .should()
                 .haveNameMatching(".*Extractor")
                 .andShould()
@@ -55,9 +74,9 @@ public class EndpointArchitectureCompliance extends BaseArchitectureComplianceCh
         ArchRule rule = classes().that()
                 .haveNameMatching(".*Extractor")
                 .and()
-                .dontHaveSimpleName("BaseDataExtractor")
+                .dontHaveSimpleName("DirectQueryBasedDataExtractor")
                 .should()
-                .beAssignableTo(BaseDataExtractor.class);
+                .beAssignableTo(DirectQueryBasedDataExtractor.class);
         rule.check(waltzOnlyClasses);
     }
 

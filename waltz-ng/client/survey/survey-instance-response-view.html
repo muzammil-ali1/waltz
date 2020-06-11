@@ -3,18 +3,17 @@
   ~ Copyright (C) 2016, 2017, 2018, 2019 Waltz open source project
   ~ See README.md for more information
   ~
-  ~ This program is free software: you can redistribute it and/or modify
-  ~ it under the terms of the GNU Lesser General Public License as published by
-  ~ the Free Software Foundation, either version 3 of the License, or
-  ~ (at your option) any later version.
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
   ~
-  ~ This program is distributed in the hope that it will be useful,
-  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
-  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  ~ GNU Lesser General Public License for more details.
+  ~     http://www.apache.org/licenses/LICENSE-2.0
   ~
-  ~ You should have received a copy of the GNU Lesser General Public License
-  ~ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific
+  ~
   -->
 
 <div>
@@ -93,13 +92,12 @@
                 <div class="row wsirv-response-row"
                      data-question-ext-id="{{qi.question.externalId}}"
                      data-question-id="{{qi.question.id}}">
-                    <div class="col-sm-5">
+                    <div class="col-sm-offset-1 col-sm-4">
                         <div ng-bind="qi.question.questionText"
-                             style="text-align: right;"
                              class="text-muted">
                         </div>
                     </div>
-                    <div class="col-sm-7">
+                    <div class="col-sm-6">
                         <div>
                             <div ng-switch="qi.question.fieldType">
                                 <div ng-switch-when="BOOLEAN">
@@ -119,9 +117,18 @@
                                     <span ng-bind="ctrl.answers[qi.question.id].answer | date:'dd-MMM-yyyy'">
                                     </span>
                                 </div>
-                                <div ng-switch-when="TEXTAREA">
+                                <div ng-switch-when="TEXTAREA|TEXT"
+                                     ng-switch-when-separator="|">
                                     <waltz-markdown text="ctrl.answers[qi.question.id].answer">
                                     </waltz-markdown>
+                                </div>
+                                <div ng-switch-when="DROPDOWN_MULTI_SELECT">
+                                    <ul class="list-unstyled">
+                                        <li ng-repeat="response in ctrl.answers[qi.question.id].answer">
+                                            <span ng-bind="response">
+                                            </span>
+                                        </li>
+                                    </ul>
                                 </div>
                                 <div ng-switch-default>
                                     <span ng-bind="ctrl.answers[qi.question.id].answer">

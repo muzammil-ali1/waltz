@@ -1,11 +1,30 @@
+/*
+ * Waltz - Enterprise Architecture
+ * Copyright (C) 2016, 2017, 2018, 2019 Waltz open source project
+ * See README.md for more information
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific
+ *
+ */
+
 import {initialiseData} from "../../../common";
 import template from "./survey-instance-summary.html";
 import {CORE_API} from "../../../common/services/core-api-utils";
 import _ from "lodash";
 import {timeFormat} from "d3-time-format";
-import {loadEntity, mkRef, sameRef} from "../../../common/entity-utils";
+import {loadEntity, sameRef} from "../../../common/entity-utils";
 import {displayError} from "../../../common/error-utils";
 import roles from "../../../user/system-roles";
+import {mkDescription} from "../../survey-utils";
 
 
 const bindings = {
@@ -131,10 +150,20 @@ function findMatchingRecipient(recipients = [], person) {
 function controller($state, serviceBroker, userService, notification) {
     const vm = initialiseData(this, initialState);
 
+
+    function loadRoles() {
+        serviceBroker.loadAppData(CORE_API.RoleStore.findAllRoles)
+            .then(r => {
+                const rolesByKey = _.keyBy(r.data, d => d.key);
+                vm.owningRole = rolesByKey[vm.surveyInstance.owningRole];
+            });
+    }
+
     function reload(force = false) {
         loadInstanceAndRun(force)
             .then(loadSubject)
             .then(loadOwner)
+            .then(loadRoles)
             .then(() => loadRecipients(force))
             .then(() => loadPreviousVersions(force))
             .then(loadUser)
@@ -144,10 +173,10 @@ function controller($state, serviceBroker, userService, notification) {
     function determineAvailableStatusActions() {
         vm.availableStatusActions = _.filter(
             statusActions,
-                act => act.predicate(
-                    vm.surveyInstance,
-                    vm.permissions,
-                    vm.currentResponseVersion.isLatest));
+            act => act.predicate(
+                vm.surveyInstance,
+                vm.permissions,
+                vm.currentResponseVersion.isLatest));
     }
 
     function loadUser() {
@@ -156,10 +185,11 @@ function controller($state, serviceBroker, userService, notification) {
             .then(u => {
                 const isOwner = vm.owner.userId === u.userName;
                 const isParticipant = _.some(vm.people, p => p.userId === u.userName);
+                const hasOwningRole = _.includes(u.roles, vm.surveyInstance.owningRole);
                 const isAdmin = userService.hasRole(u, roles.SURVEY_ADMIN);
                 vm.permissions = {
                     admin: isAdmin,
-                    owner: isOwner,
+                    owner: isOwner || hasOwningRole,
                     participant: isParticipant,
                     metaEdit: vm.currentResponseVersion.isLatest && (isOwner || isAdmin)
                 };
@@ -225,7 +255,13 @@ function controller($state, serviceBroker, userService, notification) {
                 return serviceBroker
                     .loadViewData(CORE_API.SurveyRunStore.getById, [runId])
                     .then(r => vm.surveyRun = r.data);
-            });
+            }).then(() => serviceBroker
+                .loadViewData(CORE_API.SurveyTemplateStore.getById, [vm.surveyRun.surveyTemplateId])
+                .then(r => {
+                    const surveyTemplate = r.data;
+                    vm.description = mkDescription([surveyTemplate.description, vm.surveyRun.description]);
+                })
+            );
     }
 
     function loadRecipients(force) {
@@ -296,9 +332,7 @@ function controller($state, serviceBroker, userService, notification) {
             .execute(
                 CORE_API.SurveyInstanceStore.updateRecipient,
                 [vm.surveyInstance.id, cmd])
-            .then(r => {
-                notification.success("Updated survey recipient");
-            })
+            .then(() => notification.success("Updated survey recipient"))
             .catch(e => displayError(notification, "Failed to update recipient", e))
             .finally(() => loadRecipients(true));
     };
@@ -315,7 +349,7 @@ function controller($state, serviceBroker, userService, notification) {
                     notification.success("Survey instance due date updated successfully");
                     loadInstanceAndRun(true);
                 })
-                .catch(r => notification.error("Failed to update survey instance due date"));
+                .catch(e => displayError(notification, "Failed to update survey instance due date", e));
         }
     };
 

@@ -3,18 +3,17 @@
  * Copyright (C) 2016, 2017, 2018, 2019 Waltz open source project
  * See README.md for more information
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific
+ *
  */
 
 package com.khartec.waltz.web.endpoints.api;
@@ -22,6 +21,7 @@ package com.khartec.waltz.web.endpoints.api;
 import com.khartec.waltz.model.EntityKind;
 import com.khartec.waltz.model.EntityReference;
 import com.khartec.waltz.model.app_group.AppGroup;
+import com.khartec.waltz.model.app_group.AppGroupBulkAddRequest;
 import com.khartec.waltz.model.app_group.AppGroupDetail;
 import com.khartec.waltz.model.app_group.AppGroupMember;
 import com.khartec.waltz.model.change_initiative.ChangeInitiative;
@@ -168,10 +168,14 @@ public class AppGroupEndpoint implements Endpoint {
 
         ListRoute<EntityReference> addApplicationListRoute = (request, response) -> {
             long groupId = getId(request);
-            List<Long> applicationIds = readIdsFromBody(request);
-            LOG.info("Adding applications: {}, to group: {} ", applicationIds,  groupId);
+            AppGroupBulkAddRequest appGroupBulkAddRequest = readBody(request, AppGroupBulkAddRequest.class);
+            LOG.info("Adding applications: {}, to group: {} ", appGroupBulkAddRequest.applicationIds(),  groupId);
             String userId = getUsername(request);
-            return appGroupService.addApplications(userId, groupId, applicationIds);
+            return appGroupService.addApplications(
+                    userId,
+                    groupId,
+                    appGroupBulkAddRequest.applicationIds(),
+                    appGroupBulkAddRequest.unknownIdentifiers());
         };
 
         ListRoute<EntityReference> removeApplicationRoute = (request, response) -> {
