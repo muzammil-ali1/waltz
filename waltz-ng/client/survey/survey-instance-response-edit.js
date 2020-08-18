@@ -17,7 +17,7 @@
  */
 
 import {formats, initialiseData} from "../common/index";
-import {groupQuestions} from "./survey-utils";
+import * as SurveyUtils from "./survey-utils";
 import _ from "lodash";
 import {CORE_API} from "../common/services/core-api-utils";
 import moment from "moment";
@@ -27,46 +27,31 @@ import template from "./survey-instance-response-edit.html";
 
 const initialState = {
     changeLogSection: dynamicSections.changeLogSection,
-    isUserInstanceRecipient: false,
     instanceCanBeEdited: false,
-    surveyInstance: {},
-    surveyQuestionInfos: [],
+    groupedQuestions: [],
     surveyResponses: {},
     user: {}
 };
 
+const submissionConfirmationPrompt = `The survey cannot be edited once submitted.
+Please ensure you have saved any comments you may have entered (by clicking 'Save' on each comment field).
+Are you sure you want to submit your responses?`;
 
-function indexResponses(responses = []) {
-    return _.chain(responses)
-        .map(r => r.questionResponse)
-        .map(qr => {
-            if (!_.isNil(qr.booleanResponse) && !_.isString(qr.booleanResponse)) {
-                qr.booleanResponse = qr.booleanResponse
-                    ? "true"
-                    : "false";
-            }
-            if (_.isNil(qr.booleanResponse) && !_.isString(qr.booleanResponse)){
-                qr.booleanResponse = "null"
-            }
-            if (!_.isNil(qr.dateResponse)) {
-                qr.dateResponse = moment(qr.dateResponse, formats.parseDateOnly).toDate()
-            }
-            return qr;
-        })
-        .keyBy("questionId")
-        .value();
-}
 
+const statusesWhichSupportEditing = [
+    "NOT_STARTED",
+    "IN_PROGRESS",
+    "REJECTED"
+];
 
 
 function controller($location,
+                    $q,
                     $state,
                     $stateParams,
                     $timeout,
                     notification,
                     serviceBroker,
-                    surveyInstanceStore,
-                    surveyQuestionStore,
                     userService) {
 
     const vm = initialiseData(this, initialState);
@@ -78,65 +63,59 @@ function controller($location,
         kind: "SURVEY_INSTANCE"
     };
 
-    surveyInstanceStore
-        .getById(id)
-        .then(r => {
-            vm.instanceCanBeEdited = (r.status === "NOT_STARTED" || r.status === "IN_PROGRESS" || r.status === "REJECTED");
-            vm.surveyInstance = r;
-            serviceBroker
-                .loadViewData(CORE_API.SurveyRunStore.getById, [vm.surveyInstance.surveyRunId])
-                .then(d => vm.surveyRun = d.data);
-            return r;
-        });
+    function boot() {
+        const responsePromise = serviceBroker
+            .loadViewData(CORE_API.SurveyInstanceStore.findResponses, [id])
+            .then(r => vm.surveyResponses = SurveyUtils.indexResponses(r.data));
 
-    surveyQuestionStore
-        .findForInstance(id)
-        .then(qis => vm.surveyQuestionInfos = groupQuestions(qis));
+        SurveyUtils
+            .loadSurveyInfo($q, serviceBroker, userService, id, true)
+            .then(details => {
+                vm.surveyDetails = details;
+                vm.instanceCanBeEdited = _.includes(statusesWhichSupportEditing, details.instance.status);
+            });
 
-    Promise
-        .all([userService.whoami(), surveyInstanceStore.findRecipients(id)])
-        .then(([user = {}, recipients = []]) => {
-            vm.user = user;
-            const [currentRecipients = [], otherRecipients = []] = _.partition(
-                recipients,
-                r => _.toLower(r.person.email) === _.toLower(user.userName));
+        reloadQuestions();
+    }
 
-            vm.isUserInstanceRecipient = currentRecipients.length > 0;
-            vm.otherRecipients = otherRecipients.map(r => r.person);
-        });
+    function reloadQuestions() {
+        const questionPromise = serviceBroker
+            .loadViewData(CORE_API.SurveyQuestionStore.findForInstance, [id], { force: true })
+            .then(r => {
+                vm.groupedQuestions = SurveyUtils.groupQuestions(r.data);
+            });
+    }
 
-    surveyInstanceStore
-        .findResponses(id)
-        .then(rs => vm.surveyResponses = indexResponses(rs));
-
-
-    vm.surveyInstanceLink = encodeURIComponent(
-        _.replace($location.absUrl(), "#" + $location.url(), "")
-        + $state.href("main.survey.instance.view", {id: id}));
 
     vm.saveResponse = (questionId) => {
         const questionResponse = vm.surveyResponses[questionId];
-        surveyInstanceStore.saveResponse(
-            vm.surveyInstance.id,
-            Object.assign(
-                {"questionId": questionId},
-                questionResponse,
-                {
-                    dateResponse : questionResponse && questionResponse.dateResponse
-                        ? moment(questionResponse.dateResponse).format(formats.parseDateOnly)
-                        : null
-                })
-        );
+
+        const saveParams = Object.assign(
+            {questionId},
+            questionResponse,
+            {
+                dateResponse : questionResponse && questionResponse.dateResponse
+                    ? moment(questionResponse.dateResponse).format(formats.parseDateOnly)
+                    : null
+            });
+
+        serviceBroker
+            .execute(
+                CORE_API.SurveyInstanceStore.saveResponse,
+                [vm.surveyDetails.instance.id, saveParams])
+            .then(() => reloadQuestions());
+
     };
 
     vm.saveEntityResponse = (entity, questionId) => {
+        const entityResponse = entity
+            ? _.pick(entity, ["id", "kind", "name"])
+            : null;
+
         vm.surveyResponses[questionId] = {
-            entityResponse: {
-                id: entity.id,
-                kind: entity.kind,
-                name: entity.name
-            }
+            entityResponse
         };
+
         vm.saveResponse(questionId);
     };
 
@@ -148,17 +127,26 @@ function controller($location,
     };
 
     vm.saveComment = (valObj, question) => {
-        const questionResponse = !vm.surveyResponses[question.id]
-            ? {}
-            : vm.surveyResponses[question.id];
+        // get the current response, or note
+        const questionResponse = _.get(vm.surveyResponses, [question.id], {});
         questionResponse.comment = valObj.newVal;
 
-        return surveyInstanceStore.saveResponse(
-            vm.surveyInstance.id,
+        const saveParams = [
+            vm.surveyDetails.instance.id,
             Object.assign({"questionId": question.id}, questionResponse)
-        );
+        ];
+
+        return serviceBroker
+            .execute(
+                CORE_API.SurveyInstanceStore.saveResponse,
+                saveParams);
     };
 
+
+    /**
+     * This is a bit of fakery as the questions are saved each time a response is updated.
+     * Therefore this method merely moves the user back to their instance list.
+     */
     vm.saveForLater = () => {
         $timeout(() => {
             notification.success("Survey response saved successfully");
@@ -166,35 +154,46 @@ function controller($location,
         }, 200); // allow blur events to fire
     };
 
+
+    const doSubmit = () => {
+        serviceBroker
+            .execute(
+                CORE_API.SurveyInstanceStore.updateStatus,
+                [vm.surveyDetails.instance.id, {newStatus: "COMPLETED"}])
+            .then(() => {
+                notification.success("Survey response submitted successfully");
+                // we force a reload of the notification store to update any listeners that the number
+                // of open surveys may have changed (i.e. the counter in the profile menu)
+                serviceBroker.loadAppData(
+                    CORE_API.NotificationStore.findAll,
+                    [],
+                    {force: true});
+                $state.go("main.survey.instance.response.view", {id});
+            });
+    };
+
     vm.submit = () => {
         $timeout(() => {
-            if (confirm(
-                `The survey cannot be edited once submitted.\nPlease ensure you have saved any comments you may have entered (by clicking 'Save' on each comment field).
-            \nAre you sure you want to submit your responses?`)) {
-                surveyInstanceStore.updateStatus(
-                    vm.surveyInstance.id,
-                    {newStatus: "COMPLETED"}
-                )
-                    .then(() => {
-                        notification.success("Survey response submitted successfully");
-                        serviceBroker.loadAppData(CORE_API.NotificationStore.findAll, [], {force: true});
-                        $state.go("main.survey.instance.response.view", {id: id});
-                    });
+            if (confirm(submissionConfirmationPrompt)) {
+                doSubmit();
             }
         }, 200); // allow blur events to fire, because 'confirm' blocks events
     };
+
+
+    // --- BOOT
+    boot();
 
 }
 
 controller.$inject = [
     "$location",
+    "$q",
     "$state",
     "$stateParams",
     "$timeout",
     "Notification",
     "ServiceBroker",
-    "SurveyInstanceStore",
-    "SurveyQuestionStore",
     "UserService"
 ];
 

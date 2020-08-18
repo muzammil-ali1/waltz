@@ -19,6 +19,7 @@ import _ from "lodash";
 import moment from "moment";
 import {CORE_API} from "../common/services/core-api-utils";
 import {mkSelectionOptions} from "../common/selector-utils";
+import {formats} from "../common";
 
 
 export function loadDecommData(
@@ -39,7 +40,7 @@ export function loadDecommData(
             CORE_API.MeasurableRatingPlannedDecommissionStore.findForEntityRef,
             [parentEntityRef],
             {force})
-        .then(r => ({plannedDecommissions: r.data}));
+        .then(r => r.data);
 
     const replacingDecomms = serviceBroker
         .loadViewData(
@@ -47,11 +48,40 @@ export function loadDecommData(
             [parentEntityRef])
         .then(r => ({replacingDecommissions: r.data}));
 
-    return $q
-        .all([replacementAppPromise, decommissionDatePromise, replacingDecomms])
-        .then(responses => Object.assign({}, ...responses));
+    const parentApplication = serviceBroker.loadViewData(CORE_API.ApplicationStore.getById, [parentEntityRef.id])
+        .then(r => r.data);
 
+    return $q
+        .all([replacementAppPromise, decommissionDatePromise, replacingDecomms, parentApplication])
+        .then(([replacementApps, decommissionDates, replacingDecoms, parentApplication]) => {
+
+            const appRetirementDate = new Date(parentApplication.plannedRetirementDate);
+
+            const plannedDecomms = (_.isNull(parentApplication.plannedRetirementDate))
+                ? _.map(decommissionDates, d => Object.assign({}, d, { isValid: true}))
+                : _.map(decommissionDates,d => {
+
+                    const decomDate = new Date(d.plannedDecommissionDate);
+
+                    const sameDate = appRetirementDate.getFullYear() === decomDate.getFullYear()
+                        && appRetirementDate.getMonth() === decomDate.getMonth()
+                        && appRetirementDate.getDate() === decomDate.getDate();
+
+                    const isValid = appRetirementDate > decomDate || sameDate;
+
+                    return Object.assign({}, d, { isValid: isValid})
+            });
+
+            return Object.assign({},
+                replacementApps,
+                replacingDecoms,
+                {plannedDecommissions: plannedDecomms});
+        });
 }
+
+
+
+
 
 export function loadAllData(
     $q,
@@ -172,12 +202,10 @@ export function determineStartingTab(tabs = []) {
     return _.find(tabs, t => t.ratings.length > 0 ) || tabs[0];
 }
 
+
 export function getDateAsUtc(inputDate) {
-    const formats = {
-        daysOnly: 'YYYY-MM-DD',
-        parse:'ddd MMM Do YYYY',
-    };
-    const localDate = new Date(inputDate).toDateString();
-    return moment.utc(localDate, formats.parse).format(formats.daysOnly);
+    const inputDateAsMoment = moment(inputDate, formats.parseDateOnly);
+    const finalDate = moment.utc({year: inputDateAsMoment.year(), month: inputDateAsMoment.month(), date: inputDateAsMoment.date()});
+    return finalDate.toISOString();
 }
 

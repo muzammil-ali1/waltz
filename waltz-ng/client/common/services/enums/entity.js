@@ -24,6 +24,13 @@ export const entity = {
         description: null,
         position: 10
     },
+    ALLOCATION_SCHEME: {
+        key: "ALLOCATION_SCHEME",
+        name: "Allocation Scheme",
+        icon: null,
+        description: null,
+        position: 20
+    },
     APP_CAPABILITY: {
         key: "APP_CAPABILITY",
         name: "Application Function",
@@ -192,6 +199,20 @@ export const entity = {
         description: null,
         position: 190
     },
+    MEASURABLE_RATING_PLANNED_DECOMMISSION: {
+        key: "MEASURABLE_RATING_PLANNED_DECOMMISSION",
+        name: "Viewpoint Rating Decommission",
+        icon: undefined,
+        description: null,
+        position: 195
+    },
+    MEASURABLE_RATING_REPLACEMENT: {
+        key: "MEASURABLE_RATING_REPLACEMENT",
+        name: "Viewpoint Rating Replacement Application",
+        icon: undefined,
+        description: null,
+        position: 196
+    },
     PERSON: {
         key: "PERSON",
         name: "Person",
@@ -247,6 +268,20 @@ export const entity = {
         icon: "gift",
         description: null,
         position: 250
+    },
+    SURVEY: {
+        key: "SURVEY",
+        name: "Survey",
+        icon: "wpforms",
+        description: null,
+        position: 255
+    },
+    SURVEY_INSTANCE: {
+        key: "SURVEY_INSTANCE",
+        name: "Survey Instance",
+        icon: "wpforms",
+        description: null,
+        position: 257
     },
     SYSTEM: {
         key: "SYSTEM",

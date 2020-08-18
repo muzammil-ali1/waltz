@@ -16,11 +16,17 @@
  *
  */
 
-import _ from 'lodash';
+import _ from "lodash";
+import moment from "moment";
+import {formats} from "../common";
+import roles from "../user/system-roles";
+import {CORE_API} from "../common/services/core-api-utils";
+import {loadEntity} from "../common/entity-utils";
 
 
 export function groupQuestions(questionInfos = []) {
-    const sections = _.chain(questionInfos)
+    const sections = _
+        .chain(questionInfos)
         .map(q => q.question.sectionName || "Other")
         .uniq()
         .value();
@@ -29,9 +35,9 @@ export function groupQuestions(questionInfos = []) {
 
     return _.map(sections, s => {
         return {
-            'sectionName': s,
-            'questionInfos': groupedQuestionInfos[s]
-        }
+            "sectionName": s,
+            "questionInfos": groupedQuestionInfos[s]
+        };
     });
 }
 
@@ -44,10 +50,131 @@ export function isSurveyTargetKind(entityKind = "") {
 
 
 export function mkDescription(descriptions = []) {
-
-    return _.chain(descriptions)
+    return _
+        .chain(descriptions)
         .filter(d => !_.isEmpty(d))
         .uniq()
         .join("\n\n --- \n\n")
         .value();
+}
+
+
+
+export function indexResponses(responses = []) {
+    return _
+        .chain(responses)
+        .map(d => d.questionResponse)
+        .map(qr => {
+            if (!_.isNil(qr.booleanResponse) && !_.isString(qr.booleanResponse)) {
+                qr.booleanResponse = qr.booleanResponse
+                    ? "true"
+                    : "false";
+            }
+            if (_.isNil(qr.booleanResponse) && !_.isString(qr.booleanResponse)){
+                qr.booleanResponse = "null"
+            }
+            if (!_.isNil(qr.dateResponse)) {
+                qr.dateResponse = moment(qr.dateResponse, formats.parseDateOnly).toDate()
+            }
+            return qr;
+        })
+        .keyBy("questionId")
+        .value();
+}
+
+
+export function loadSurveyInfo($q,
+                               serviceBroker,
+                               userService,
+                               surveyInstanceId,
+                               force = false) {
+
+    const recipientsPromise = serviceBroker
+        .loadViewData(CORE_API.SurveyInstanceStore.findRecipients, [surveyInstanceId], {force})
+        .then(r => r.data);
+
+    const instancePromise = serviceBroker
+        .loadViewData(CORE_API.SurveyInstanceStore.getById, [surveyInstanceId], {force})
+        .then(r => r.data);
+
+    const versionsPromise = instancePromise
+        .then(instance => serviceBroker
+            .loadViewData(
+                CORE_API.SurveyInstanceStore.findPreviousVersions,
+                [instance.originalInstanceId || instance.id]))
+        .then(r => r.data);
+
+    const runPromise = instancePromise
+        .then(instance => serviceBroker
+            .loadViewData(CORE_API.SurveyRunStore.getById, [instance.surveyRunId]))
+        .then(r => r.data);
+
+    const templatePromise = runPromise
+        .then(run => serviceBroker
+            .loadViewData(CORE_API.SurveyTemplateStore.getById, [run.surveyTemplateId]))
+        .then(r => r.data);
+
+    const ownerPromise = runPromise
+        .then(run => serviceBroker
+            .loadViewData(CORE_API.PersonStore.getById, [run.ownerId]))
+        .then(r => r.data);
+
+    const owningRolePromise = instancePromise
+        .then(instance => serviceBroker
+            .loadAppData(CORE_API.RoleStore.findAllRoles)
+            .then(r => _.find(r.data, d => d.key === instance.owningRole)));
+
+    const userPromise = userService.whoami();
+
+    const  subjectPromise = instancePromise
+        .then(instance => loadEntity(serviceBroker, instance.surveyEntity));
+
+    const promises = [
+        userPromise,
+        instancePromise,
+        runPromise,
+        templatePromise,
+        recipientsPromise,
+        ownerPromise,
+        owningRolePromise,
+        versionsPromise,
+        subjectPromise
+    ];
+
+    return $q
+        .all(promises)
+        .then(([u, instance, run, template, recipients, owner, owningRole, versions, subject]) => {
+
+            const people = _.map(recipients, d => d.person);
+            const latestInstanceId = instance.originalInstanceId || instance.id;
+
+            const isLatest = latestInstanceId === instance.id;
+            const isOwner = owner.userId === u.userName;
+            const isParticipant = _.some(people, p => p.userId === u.userName);
+            const hasOwningRole = _.includes(u.roles, instance.owningRole);
+            const isAdmin = userService.hasRole(u, roles.SURVEY_ADMIN);
+
+            const permissions = {
+                admin: isAdmin,
+                owner: isOwner || hasOwningRole,
+                participant: isParticipant,
+                metaEdit: isLatest && (isOwner || isAdmin)
+            };
+
+            const result = {
+                instance,
+                recipients,
+                owner,
+                owningRole,
+                run,
+                template,
+                isLatest,
+                latestInstanceId,
+                permissions,
+                versions,
+                subject
+            };
+
+            return result;
+        });
 }

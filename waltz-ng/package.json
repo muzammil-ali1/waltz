@@ -14,7 +14,8 @@
     "build-debug": "webpack --config webpack.dev.js --progress --profile --colors",
     "watch": "webpack --progress --watch --colors",
     "start-dev": "node lib/server-development",
-    "start": "node lib/server-production"
+    "start": "node lib/server-production",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@uirouter/angularjs": "^1.0.20",
@@ -56,6 +57,7 @@
     "moment": "2.19.3",
     "ng-showdown": "1.1.0",
     "ng-tags-input": "3.2.0",
+    "patch-package": "^6.2.2",
     "satellizer": "0.15.5",
     "ui-select": "0.19.8",
     "xlsx": "0.11.13"

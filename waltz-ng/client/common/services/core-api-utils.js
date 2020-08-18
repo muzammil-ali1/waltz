@@ -32,6 +32,7 @@ import {AuthSourcesStore_API as AuthSourcesStore} from "../../auth-sources/servi
 import {BookmarkStore_API as BookmarkStore} from "../../bookmarks/services/bookmark-store";
 import {ChangeInitiativeStore_API as ChangeInitiativeStore} from "../../change-initiative/services/change-initiative-store";
 import {ChangeLogStore_API as ChangeLogStore} from "../../change-log/services/change-log-store";
+import {ChangeLogSummariesStore_API as ChangeLogSummariesStore} from "../../change-log/services/change-log-summaries-store";
 import {ChangeSetStore_API as ChangeSetStore} from "../../change-set/services/change-set-store";
 import {ChangeUnitStore_API as ChangeUnitStore} from "../../change-unit/services/change-unit-store";
 import {ChangeUnitViewService_API as ChangeUnitViewService} from "../../change-unit/services/change-unit-view-service";
@@ -53,6 +54,7 @@ import {EnumValueStore_API as EnumValueStore} from "../../enum-value/services/en
 import {EntitySvgDiagramStore_API as EntitySvgDiagramStore} from "../../entity-svg-diagram/services/entity-svg-diagram-store";
 import {ExternalIdentifierStore_API as ExternalIdentifierStore} from "../../external-identifier/services/external-identifier-store"
 import {FacetStore_API as FacetStore} from "../../facet/services/facet-store";
+import {FavouritesStore_API as FavouritesStore} from "../../app-groups/services/favourites-store";
 import {FlowDiagramStore_API as FlowDiagramStore} from "../../flow-diagram/services/flow-diagram-store";
 import {FlowDiagramAnnotationStore_API as FlowDiagramAnnotationStore} from "../../flow-diagram/services/flow-diagram-annotation-store";
 import {FlowDiagramEntityStore_API as FlowDiagramEntityStore} from "../../flow-diagram/services/flow-diagram-entity-store";
@@ -118,6 +120,7 @@ export const CORE_API = {
     BookmarkStore,
     ChangeInitiativeStore,
     ChangeLogStore,
+    ChangeLogSummariesStore,
     ChangeSetStore,
     ChangeUnitStore,
     ChangeUnitViewService,
@@ -138,6 +141,7 @@ export const CORE_API = {
     EnumValueStore,
     ExternalIdentifierStore,
     FacetStore,
+    FavouritesStore,
     FlowDiagramStore,
     FlowDiagramAnnotationStore,
     FlowDiagramEntityStore,
