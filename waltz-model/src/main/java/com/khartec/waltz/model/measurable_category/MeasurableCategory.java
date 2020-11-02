@@ -21,9 +21,12 @@ package com.khartec.waltz.model.measurable_category;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.khartec.waltz.model.*;
+import com.khartec.waltz.model.assessment_definition.AssessmentDefinition;
 import com.khartec.waltz.model.rating.RatingScheme;
 import com.khartec.waltz.model.user.SystemRole;
 import org.immutables.value.Value;
+
+import java.util.Optional;
 
 /**
  * A measurable category represents a classifier for a hierarchy of
@@ -46,7 +49,9 @@ public abstract class MeasurableCategory implements
         ExternalIdProvider,
         LastUpdatedProvider,
         RagNamesProvider,
-        EntityKindProvider {
+        EntityKindProvider,
+        WaltzEntity
+{
 
 
     @Value.Default
@@ -81,4 +86,21 @@ public abstract class MeasurableCategory implements
      */
     public abstract long ratingSchemeId();
 
+    /**
+     * If provided, this assessment_definition constrains the measurable ratings
+     * for this category to values with a lower position than the related assessment rating
+     *
+     * @return id which links to a {@link AssessmentDefinition}
+     */
+    public abstract Optional<Long> assessmentDefinitionId();
+
+
+    public EntityReference entityReference() {
+        return ImmutableEntityReference.builder()
+                .kind(EntityKind.MEASURABLE_CATEGORY)
+                .id(id().get())
+                .name(name())
+                .description(description())
+                .build();
+    }
 }

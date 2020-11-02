@@ -1,4 +1,3 @@
-
 /*
  * Waltz - Enterprise Architecture
  * Copyright (C) 2016, 2017, 2018, 2019 Waltz open source project
@@ -37,6 +36,13 @@ function store($http, BaseApiUrl) {
     };
 
 
+    const findSuggestedByEntityRef = (ref) => {
+        return $http
+            .get(`${BASE}/suggested/entity/${ref.kind}/${ref.id}`)
+            .then(result => result.data);
+    };
+
+
     // ONLY FOR LOGICAL FLOWS
     const findByFlowIds = (flowIds = [], kind = entity.LOGICAL_DATA_FLOW.key) => {
         return $http
@@ -51,12 +57,21 @@ function store($http, BaseApiUrl) {
             .then(result => result.data);
     };
 
+    // ONLY FOR LOGICAL FLOWS
+    const findDatatypeUsageCharacteristics = (ref) => {
+        checkIsEntityRef(ref);
+        return $http
+            .get(`${BASE}/entity/${ref.kind}/${ref.id}/usage-characteristics`)
+            .then(result => result.data);
+    };
 
     return {
         findBySelector,
         findByEntityReference,
+        findSuggestedByEntityRef,
         findByFlowIds,
-        save
+        save,
+        findDatatypeUsageCharacteristics,
     };
 }
 
@@ -86,10 +101,20 @@ export const DataTypeDecoratorStore_API = {
         serviceFnName: 'findByFlowIds',
         description: 'finds data types for flow ids'
     },
+    findSuggestedByEntityRef: {
+        serviceName,
+        serviceFnName: 'findSuggestedByEntityRef',
+        description: 'finds suggested datatypes by entity reference'
+    },
     save: {
         serviceName,
         serviceFnName: 'save',
         description: 'saves (inserts/deletes) data types for a given entity ref'
+    },
+    findDatatypeUsageCharacteristics: {
+        serviceName,
+        serviceFnName: 'findDatatypeUsageCharacteristics',
+        description: 'finds datatype usage characteristics for this entity'
     }
 };
 

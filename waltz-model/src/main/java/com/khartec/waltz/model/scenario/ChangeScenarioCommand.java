@@ -18,11 +18,14 @@
 
 package com.khartec.waltz.model.scenario;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.khartec.waltz.model.Nullable;
 import com.khartec.waltz.model.command.Command;
 import org.immutables.value.Value;
+
+import java.util.Objects;
 
 @Value.Immutable
 @JsonSerialize(as = ImmutableChangeScenarioCommand.class)
@@ -39,4 +42,10 @@ public abstract class ChangeScenarioCommand implements Command {
     public abstract Character previousRating();
     @Nullable
     public abstract String comment();
+
+    @Value.Derived
+    @JsonIgnore
+    public boolean hasRatingChanged() {
+        return !Objects.equals(rating(), previousRating());
+    }
 }

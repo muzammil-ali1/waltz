@@ -74,6 +74,7 @@ import {MeasurableStore_API as MeasurableStore} from "../../measurable/services/
 import {NotificationStore_API as NotificationStore} from "../../notification/services/notification-store";
 import {OrgUnitStore_API as OrgUnitStore} from "../../org-units/services/org-unit-store";
 import {PersonStore_API as PersonStore} from "../../person/services/person-store";
+import {PermissionGroupStore_API as PermissionGroupStore} from "../../permission-group/services/permission-group-store";
 import {PhysicalFlowStore_API as PhysicalFlowStore} from "../../physical-flows/services/physical-flow-store";
 import {PhysicalFlowParticipantStore_API as PhysicalFlowParticipantStore} from "../../physical-flows/services/physical-flow-participant-store";
 import {PhysicalSpecDefinitionFieldStore_API as PhysicalSpecDefinitionFieldStore} from "../../physical-specifications/services/physical-spec-definition-field-store";
@@ -82,6 +83,7 @@ import {PhysicalSpecDefinitionSampleFileStore_API as PhysicalSpecDefinitionSampl
 import {PhysicalSpecificationStore_API as PhysicalSpecificationStore} from "../../physical-specifications/services/physical-specification-store";
 import {RatingSchemeStore_API as RatingSchemeStore} from "../../ratings/services/rating-scheme-store";
 import {RelationshipKindStore_API as RelationshipKindStore} from "../../entity-relationship/services/relationship-kind-store";
+import {ReportGridStore_API as ReportGridStore} from "../../report-grid/services/report-grid-store";
 import {RoadmapStore_API as RoadmapStore} from "../../roadmap/services/roadmap-store";
 import {ScenarioStore_API as ScenarioStore} from "../../scenario/services/scenario-store";
 import {ServerInfoStore_API as ServerInfoStore} from "../../server-info/services/server-info-store";
@@ -101,6 +103,7 @@ import {TechnologyStatisticsService_API as TechnologyStatisticsService} from "..
 import {ThumbnailStore_API as ThumbnailStore} from "../../thumbnail/services/thumbnail-store";
 import {UserStore_API as UserStore} from "../../user/services/user-store";
 import {RoleStore_API as RoleStore} from "../../role/services/role-store";
+import {VulnerabilityStore_API as VulnerabilityStore} from "../../software-catalog/services/vulnerability-store";
 
 
 export const CORE_API = {
@@ -162,6 +165,7 @@ export const CORE_API = {
     NotificationStore,
     OrgUnitStore,
     PersonStore,
+    PermissionGroupStore,
     PhysicalFlowStore,
     PhysicalFlowParticipantStore,
     PhysicalSpecDefinitionFieldStore,
@@ -170,6 +174,7 @@ export const CORE_API = {
     PhysicalSpecificationStore,
     RatingSchemeStore,
     RelationshipKindStore,
+    ReportGridStore,
     RoadmapStore,
     ScenarioStore,
     ServerInfoStore,
@@ -188,7 +193,8 @@ export const CORE_API = {
     TechnologyStatisticsService,
     ThumbnailStore,
     UserStore,
-    RoleStore
+    RoleStore,
+    VulnerabilityStore
 };
 
 

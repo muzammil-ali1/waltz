@@ -16,7 +16,6 @@
  *
  */
 
-import "babel-polyfill";
 import "angular-animate";
 import "angular-loading-bar";
 import "angular-local-storage";
@@ -93,6 +92,7 @@ import Notification from "./notification";
 import OrgUnits from "./org-units";
 import Orphan from "./orphan";
 import Person from "./person";
+import PermissionGroup from "./permission-group";
 import PhysicalFlows from "./physical-flows";
 import PhysicalSpecifications from "./physical-specifications";
 import PhysicalField from "./physical-field";
@@ -100,6 +100,7 @@ import Playpen from "./playpen";
 import Playpen5 from "./playpen/5";
 import Profile from "./profile";
 import Ratings from "./ratings";
+import ReportGrid from "./report-grid";
 import Roadmap from "./roadmap";
 import Role from "./role";
 import Scenario from "./scenario";
@@ -128,6 +129,7 @@ const dependencies = [
     "ui.grid.exporter",
     "ui.grid.resizeColumns",
     "ui.grid.selection",
+    "ui.grid.pinning",
     "ui-notification",
     "ngAnimate",
     "ngSanitize",
@@ -199,6 +201,7 @@ const dependencies = [
     OrgUnits(),
     Orphan(),
     Person(),
+    PermissionGroup(),
     PhysicalFlows(),
     PhysicalSpecifications(),
     PhysicalField(),
@@ -206,6 +209,7 @@ const dependencies = [
     Playpen5(),
     Profile(),
     Ratings(),
+    ReportGrid(),
     Roadmap(),
     Role(),
     Scenario(),

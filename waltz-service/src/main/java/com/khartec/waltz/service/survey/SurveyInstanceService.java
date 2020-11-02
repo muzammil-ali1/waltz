@@ -30,6 +30,7 @@ import com.khartec.waltz.model.changelog.ImmutableChangeLog;
 import com.khartec.waltz.model.person.Person;
 import com.khartec.waltz.model.survey.*;
 import com.khartec.waltz.model.user.SystemRole;
+import com.khartec.waltz.model.utils.IdUtilities;
 import com.khartec.waltz.service.changelog.ChangeLogService;
 import com.khartec.waltz.service.user.UserRoleService;
 import org.jooq.Record1;
@@ -38,12 +39,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static com.khartec.waltz.common.Checks.checkNotNull;
 import static com.khartec.waltz.common.Checks.checkTrue;
 import static com.khartec.waltz.common.OptionalUtilities.contentsEqual;
-import static java.util.Optional.ofNullable;
+import static com.khartec.waltz.model.survey.SurveyInstanceStateMachineFactory.simple;
 
 @Service
 public class SurveyInstanceService {
@@ -54,8 +57,9 @@ public class SurveyInstanceService {
     private final SurveyInstanceRecipientDao surveyInstanceRecipientDao;
     private final SurveyQuestionResponseDao surveyQuestionResponseDao;
     private final SurveyInstanceIdSelectorFactory surveyInstanceIdSelectorFactory = new SurveyInstanceIdSelectorFactory();
-    private SurveyRunDao surveyRunDao;
-    private UserRoleService userRoleService;
+    private final SurveyRunDao surveyRunDao;
+    private final UserRoleService userRoleService;
+    private final SurveyQuestionService surveyQuestionService;
 
 
     @Autowired
@@ -65,7 +69,9 @@ public class SurveyInstanceService {
                                  SurveyInstanceRecipientDao surveyInstanceRecipientDao,
                                  SurveyQuestionResponseDao surveyQuestionResponseDao,
                                  SurveyRunDao surveyRunDao,
-                                 UserRoleService userRoleService) {
+                                 UserRoleService userRoleService,
+                                 SurveyQuestionService surveyQuestionService) {
+
         checkNotNull(changeLogService, "changeLogService cannot be null");
         checkNotNull(personDao, "personDao cannot be null");
         checkNotNull(surveyInstanceDao, "surveyInstanceDao cannot be null");
@@ -73,6 +79,7 @@ public class SurveyInstanceService {
         checkNotNull(surveyQuestionResponseDao, "surveyQuestionResponseDao cannot be null");
         checkNotNull(surveyRunDao, "surveyRunDao cannot be null");
         checkNotNull(userRoleService, "userRoleService cannot be null");
+        checkNotNull(surveyQuestionService, "surveyQuestionService cannot be null");
 
         this.changeLogService = changeLogService;
         this.personDao = personDao;
@@ -81,6 +88,7 @@ public class SurveyInstanceService {
         this.surveyQuestionResponseDao = surveyQuestionResponseDao;
         this.surveyRunDao = surveyRunDao;
         this.userRoleService = userRoleService;
+        this.surveyQuestionService = surveyQuestionService;
     }
 
 
@@ -131,8 +139,8 @@ public class SurveyInstanceService {
 
         SurveyInstance surveyInstance = surveyInstanceDao.getById(instanceId);
         checkTrue(surveyInstance.status() == SurveyInstanceStatus.NOT_STARTED
-                    || surveyInstance.status() == SurveyInstanceStatus.IN_PROGRESS
-                    || surveyInstance.status() == SurveyInstanceStatus.REJECTED,
+                        || surveyInstance.status() == SurveyInstanceStatus.IN_PROGRESS
+                        || surveyInstance.status() == SurveyInstanceStatus.REJECTED,
                 "Survey instance cannot be updated, current status: " + surveyInstance.status());
 
         SurveyInstanceQuestionResponse instanceQuestionResponse = ImmutableSurveyInstanceQuestionResponse.builder()
@@ -167,35 +175,39 @@ public class SurveyInstanceService {
     }
 
 
-    public int updateStatus(String userName, long instanceId, SurveyInstanceStatusChangeCommand command) {
+    public SurveyInstanceStatus updateStatus(String userName, long instanceId, SurveyInstanceStatusChangeCommand command) {
         checkNotNull(command, "command cannot be null");
 
-        if (command.newStatus() != SurveyInstanceStatus.COMPLETED) {
-            checkPersonIsOwnerOrAdmin(userName, instanceId);
-        }
-
         SurveyInstance surveyInstance = surveyInstanceDao.getById(instanceId);
+        checkTrue(surveyInstance.originalInstanceId() == null, "You cannot change the status of Approved/Rejected surveys");
 
-        // if survey is being sent back, store current responses as a version
-        if ((surveyInstance.status() == SurveyInstanceStatus.COMPLETED || surveyInstance.status() == SurveyInstanceStatus.APPROVED)
-                && command.newStatus() == SurveyInstanceStatus.REJECTED) {
+        SurveyInstancePermissions permissions = getPermissions(userName, instanceId);
+        SurveyInstanceStatus newStatus = simple(surveyInstance.status()).process(command.action(), permissions, surveyInstance);
+        if (command.action() == SurveyInstanceAction.REOPENING) {
             long versionedInstanceId = surveyInstanceDao.createPreviousVersion(surveyInstance);
             surveyQuestionResponseDao.cloneResponses(surveyInstance.id().get(), versionedInstanceId);
             surveyInstanceDao.clearApproved(instanceId);
         }
 
-        if ((surveyInstance.status() == SurveyInstanceStatus.APPROVED || surveyInstance.status() == SurveyInstanceStatus.WITHDRAWN)
-                && command.newStatus() == SurveyInstanceStatus.IN_PROGRESS) {
-            long versionedInstanceId = surveyInstanceDao.createPreviousVersion(surveyInstance);
-            surveyQuestionResponseDao.cloneResponses(surveyInstance.id().get(), versionedInstanceId);
-            surveyInstanceDao.clearApproved(instanceId);
+        int nbupdates = 0;
+        switch (command.action()) {
+            case APPROVING:
+                nbupdates = surveyInstanceDao.markApproved(instanceId, userName);
+                break;
+            case REOPENING:
+                // if survey is being sent back, store current responses as a version
+                long versionedInstanceId = surveyInstanceDao.createPreviousVersion(surveyInstance);
+                surveyQuestionResponseDao.cloneResponses(surveyInstance.id().get(), versionedInstanceId);
+                surveyInstanceDao.clearApproved(instanceId);
+                // intended drop thru'
+            default:
+                nbupdates = surveyInstanceDao.updateStatus(instanceId, newStatus);
         }
 
-        int result = surveyInstanceDao.updateStatus(instanceId, command.newStatus());
-
-        if (result > 0) {
-            if (command.newStatus() == SurveyInstanceStatus.COMPLETED) {
+        if (nbupdates > 0) {
+            if (newStatus == SurveyInstanceStatus.COMPLETED) {
                 surveyInstanceDao.updateSubmitted(instanceId, userName);
+                removeUnnecessaryResponses(instanceId);
             }
 
             changeLogService.write(
@@ -203,12 +215,32 @@ public class SurveyInstanceService {
                             .operation(Operation.UPDATE)
                             .userId(userName)
                             .parentReference(EntityReference.mkRef(EntityKind.SURVEY_INSTANCE, instanceId))
-                            .message("Survey Instance: status changed to " + command.newStatus()
+                            .message("Survey Instance: status changed to " + newStatus + " with action " + command.action()
                                     + command.reason().map(r -> ", [Reason]: " + r).orElse(""))
                             .build());
         }
 
-        return result;
+        return newStatus;
+    }
+
+
+    protected int removeUnnecessaryResponses(long instanceId) {
+        List<SurveyQuestion> availableQuestions = surveyQuestionService.findForSurveyInstance(instanceId);
+        List<SurveyInstanceQuestionResponse> questionResponses = surveyQuestionResponseDao.findForInstance(instanceId);
+        Set<Long> availableQuestionIds = IdUtilities.toIds(availableQuestions);
+
+        List<SurveyInstanceQuestionResponse> toRemove = new ArrayList<>();
+        for (SurveyInstanceQuestionResponse qr : questionResponses) {
+            if (!availableQuestionIds.contains(qr.questionResponse().questionId())) {
+                toRemove.add(qr);
+            }
+        }
+
+        if (!toRemove.isEmpty()) {
+            return surveyQuestionResponseDao.deletePreviousResponse(toRemove);
+        } else {
+            return 0;
+        }
     }
 
 
@@ -235,30 +267,8 @@ public class SurveyInstanceService {
     }
 
 
-    public int markApproved(String userName, long instanceId, String reason) {
-        checkNotNull(userName, "userName cannot be null");
-
-        checkPersonIsOwnerOrAdmin(userName, instanceId);
-        SurveyInstance surveyInstance = surveyInstanceDao.getById(instanceId);
-
-        checkTrue(surveyInstance.status() == SurveyInstanceStatus.COMPLETED, "Only completed surveys can be approved");
-
-        int result = surveyInstanceDao.markApproved(instanceId, userName);
-
-        changeLogService.write(
-                ImmutableChangeLog.builder()
-                        .operation(Operation.UPDATE)
-                        .userId(userName)
-                        .parentReference(EntityReference.mkRef(EntityKind.SURVEY_INSTANCE, instanceId))
-                        .message("Survey Instance: Approved" + ofNullable(reason).map(r -> ", [Reason]: " + r).orElse(""))
-                        .build());
-
-        return result;
-    }
-
-
     public List<SurveyInstance> findBySurveyInstanceIdSelector(IdSelectionOptions idSelectionOptions) {
-        checkNotNull(idSelectionOptions,  "idSelectionOptions cannot be null");
+        checkNotNull(idSelectionOptions, "idSelectionOptions cannot be null");
 
         Select<Record1<Long>> selector = surveyInstanceIdSelectorFactory.apply(idSelectionOptions);
 
@@ -285,7 +295,6 @@ public class SurveyInstanceService {
 
         return rc;
     }
-
 
 
     public boolean updateRecipient(String username, SurveyInstanceRecipientUpdateCommand command) {
@@ -372,4 +381,32 @@ public class SurveyInstanceService {
                         .build());
     }
 
+
+    public List<SurveyInstanceAction> findPossibleActionsForInstance(String userName, long instanceId) {
+        SurveyInstance surveyInstance = surveyInstanceDao.getById(instanceId);
+        SurveyInstancePermissions permissions = getPermissions(userName, instanceId);
+        SurveyInstanceStateMachine stateMachine = simple(surveyInstance.status());
+        return stateMachine.nextPossibleActions(permissions, surveyInstance);
+    }
+
+
+    public SurveyInstancePermissions getPermissions(String userName, Long instanceId) {
+        Person person = personDao.getActiveByUserEmail(userName);
+        SurveyInstance instance = surveyInstanceDao.getById(instanceId);
+        SurveyRun run = surveyRunDao.getById(instance.surveyRunId());
+
+        boolean isAdmin = userRoleService.hasRole(userName, SystemRole.SURVEY_ADMIN);
+        boolean isParticipant = surveyInstanceRecipientDao.isPersonInstanceRecipient(person.id().get(), instanceId);
+        boolean isOwner = contentsEqual(person.id(), run.ownerId());
+        boolean hasOwningRole = userRoleService.hasRole(person.email(), instance.owningRole());
+        boolean isLatest = instance.originalInstanceId() == null;
+
+        return ImmutableSurveyInstancePermissions.builder()
+                .isAdmin(isAdmin)
+                .isParticipant(isParticipant)
+                .isOwner(isOwner)
+                .hasOwnerRole(hasOwningRole)
+                .isMetaEdit(isLatest && (isAdmin || isOwner || hasOwningRole))
+                .build();
+    }
 }

@@ -68,10 +68,14 @@ function controller($element, $window) {
             .append(vm.diagram.svg);
 
         vm.svgGroupSel = select($element[0])
-                            .select("svg")
-                            .select("svg > g");
+            .select("svg")
+            .select("svg > g");
 
-        resize($element, $window, vm.diagram.displayWidthPercent, vm.diagram.displayHeightPercent);
+        resize(
+            $element,
+            $window,
+            vm.diagram.displayWidthPercent,
+            vm.diagram.displayHeightPercent);
 
         const dataProp = `data-${vm.diagram.keyProperty}`;
         const dataBlocks = svgEl.querySelectorAll(`[${dataProp}]`);

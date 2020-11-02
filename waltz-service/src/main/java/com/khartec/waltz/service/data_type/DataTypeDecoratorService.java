@@ -25,7 +25,9 @@ import com.khartec.waltz.data.logical_flow.LogicalFlowDao;
 import com.khartec.waltz.data.physical_specification.PhysicalSpecificationDao;
 import com.khartec.waltz.model.*;
 import com.khartec.waltz.model.changelog.ImmutableChangeLog;
+import com.khartec.waltz.model.datatype.DataType;
 import com.khartec.waltz.model.datatype.DataTypeDecorator;
+import com.khartec.waltz.model.datatype.DataTypeUsageCharacteristics;
 import com.khartec.waltz.model.datatype.ImmutableDataTypeDecorator;
 import com.khartec.waltz.model.logical_flow.LogicalFlow;
 import com.khartec.waltz.model.physical_flow.PhysicalFlow;
@@ -34,6 +36,7 @@ import com.khartec.waltz.model.rating.AuthoritativenessRating;
 import com.khartec.waltz.service.changelog.ChangeLogService;
 import com.khartec.waltz.service.data_flow_decorator.LogicalFlowDecoratorRatingsCalculator;
 import com.khartec.waltz.service.data_flow_decorator.LogicalFlowDecoratorService;
+import com.khartec.waltz.service.logical_flow.LogicalFlowService;
 import com.khartec.waltz.service.physical_flow.PhysicalFlowService;
 import com.khartec.waltz.service.usage_info.DataTypeUsageService;
 import org.jooq.Record1;
@@ -51,6 +54,8 @@ import static com.khartec.waltz.common.DateTimeUtilities.nowUtc;
 import static com.khartec.waltz.common.ListUtilities.newArrayList;
 import static com.khartec.waltz.model.EntityKind.*;
 import static com.khartec.waltz.model.EntityReference.mkRef;
+import static com.khartec.waltz.model.IdSelectionOptions.mkOpts;
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 @Service
@@ -60,6 +65,7 @@ public class DataTypeDecoratorService {
     private final PhysicalFlowService physicalFlowService;
     private final DataTypeDecoratorDaoSelectorFactory dataTypeDecoratorDaoSelectorFactory;
     private final LogicalFlowDao logicalFlowDao;
+    private final LogicalFlowService logicalFlowService;
     private final LogicalFlowDecoratorRatingsCalculator ratingsCalculator;
     private final DataTypeUsageService dataTypeUsageService;
     private final DataTypeService dataTypeService;
@@ -73,6 +79,7 @@ public class DataTypeDecoratorService {
                                     PhysicalFlowService physicalFlowService,
                                     DataTypeDecoratorDaoSelectorFactory dataTypeDecoratorDaoSelectorFactory,
                                     LogicalFlowDao logicalFlowDao,
+                                    LogicalFlowService logicalFlowService,
                                     LogicalFlowDecoratorRatingsCalculator ratingsCalculator,
                                     DataTypeUsageService dataTypeUsageService,
                                     DataTypeService dataTypeService,
@@ -84,6 +91,7 @@ public class DataTypeDecoratorService {
         this.changeLogService = changeLogService;
         this.physicalFlowService = physicalFlowService;
         this.logicalFlowDao = logicalFlowDao;
+        this.logicalFlowService = logicalFlowService;
         this.ratingsCalculator = ratingsCalculator;
         this.dataTypeUsageService = dataTypeUsageService;
         this.dataTypeService = dataTypeService;
@@ -197,6 +205,7 @@ public class DataTypeDecoratorService {
         return result;
     }
 
+
     private void recalculateDataTypeUsageForApplications(EntityReference associatedEntityReference) {
         if(LOGICAL_DATA_FLOW.equals(associatedEntityReference.kind())) {
             LogicalFlow flow = logicalFlowDao.getByFlowId(associatedEntityReference.id());
@@ -305,18 +314,24 @@ public class DataTypeDecoratorService {
                 break;
             case PHYSICAL_SPECIFICATION:
                 PhysicalSpecification physicalSpecification = physicalSpecificationDao.getById(entityReference.id());
-                String message = String.format("Physical Specification [%s]: Data types changed from [%s] to [%s]",
-                        physicalSpecification,
-                        currentDataTypeNames,
-                        updatedDataTypeNames);
-                audit(message, physicalSpecification.entityReference(), userName);
+                logicalFlowService
+                        .findBySelector(mkOpts(entityReference))
+                        .forEach(lf -> {
+                            String message = String.format("Physical Specification [%s]: Data types changed from [%s] to [%s]",
+                                    physicalSpecification.name(),
+                                    currentDataTypeNames,
+                                    updatedDataTypeNames);
+                            audit(message, physicalSpecification.entityReference(), userName);
+                            audit(message, lf.source(), userName);
+                            audit(message, lf.target(), userName);
+                        });
                 break;
         }
     }
 
 
     private String getAssociatedDatatypeNamesAsCsv(EntityReference entityReference) {
-        IdSelectionOptions idSelectionOptions = IdSelectionOptions.mkOpts(
+        IdSelectionOptions idSelectionOptions = mkOpts(
                 entityReference,
                 HierarchyQueryScope.EXACT);
 
@@ -327,5 +342,25 @@ public class DataTypeDecoratorService {
                 .map(EntityReference::name)
                 .map(Optional::get)
                 .collect(Collectors.joining(", "));
+    }
+
+
+    public Collection<DataType> findSuggestedByEntityRef(EntityReference entityReference) {
+
+        List<LogicalFlow> logicalFlows = logicalFlowService.findBySelector(mkOpts(entityReference));
+
+        if(isEmpty(logicalFlows)){
+            return emptyList();
+        } else {
+            LogicalFlow flow = first(logicalFlows);
+            return dataTypeService.findSuggestedBySourceEntityRef(flow.source());
+        }
+    }
+
+
+    public Collection<DataTypeUsageCharacteristics> findDatatypeUsageCharacteristics(EntityReference ref) {
+        return dataTypeDecoratorDaoSelectorFactory
+            .getDao(ref.kind())
+            .findDatatypeUsageCharacteristics(ref);
     }
 }
