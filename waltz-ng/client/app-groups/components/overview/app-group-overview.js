@@ -17,14 +17,13 @@
  */
 
 import _ from "lodash";
-import {calcComplexitySummary} from "../../../complexity/services/complexity-utilities";
 import {initialiseData} from "../../../common/index";
 import {CORE_API} from "../../../common/services/core-api-utils";
 import {mkSelectionOptions} from "../../../common/selector-utils";
 import {hierarchyQueryScope} from "../../../common/services/enums/hierarchy-query-scope";
 import {entityLifecycleStatus} from "../../../common/services/enums/entity-lifecycle-status";
 
-import template from "./app-group-summary.html";
+import template from "./app-group-overview.html";
 
 
 const bindings = {
@@ -96,18 +95,6 @@ function controller($q, serviceBroker, userService) {
 
         serviceBroker
             .loadViewData(
-                CORE_API.AssetCostStore.findTotalCostForAppSelector,
-                [ selector ])
-            .then(r => vm.totalCost = r.data);
-
-        serviceBroker
-            .loadViewData(
-                CORE_API.ComplexityStore.findBySelector,
-                [ selector ])
-            .then(r => vm.complexitySummary = calcComplexitySummary(r.data));
-
-        serviceBroker
-            .loadViewData(
                 CORE_API.LogicalFlowStore.calculateStats,
                 [ selector ])
             .then(r => vm.flowStats = r.data);
@@ -162,5 +149,5 @@ const component = {
 
 export default {
     component,
-    id: "waltzAppGroupSummary"
+    id: "waltzAppGroupOverview"
 }

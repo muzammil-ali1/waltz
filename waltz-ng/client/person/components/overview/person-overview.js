@@ -16,14 +16,13 @@
  *
  */
 
-import {calcComplexitySummary} from "../../../complexity/services/complexity-utilities";
 import {initialiseData} from "../../../common/index";
 import {CORE_API} from "../../../common/services/core-api-utils";
 import {mkSelectionOptions} from "../../../common/selector-utils";
 import {hierarchyQueryScope} from "../../../common/services/enums/hierarchy-query-scope";
 import {entityLifecycleStatus} from "../../../common/services/enums/entity-lifecycle-status";
 
-import template from "./person-summary.html";
+import template from "./person-overview.html";
 
 
 const bindings = {
@@ -72,20 +71,6 @@ function controller(serviceBroker) {
                 [ selector ])
             .then(r => vm.applications = r.data);
 
-
-        serviceBroker
-            .loadViewData(
-                CORE_API.ComplexityStore.findBySelector,
-                [ selector ])
-            .then(r => {
-                vm.complexitySummary = calcComplexitySummary(r.data);
-            });
-
-        serviceBroker
-            .loadViewData(
-                CORE_API.AssetCostStore.findTotalCostForAppSelector,
-                [ selector ])
-            .then(r => vm.totalCost = r.data);
     };
 
 
@@ -111,5 +96,5 @@ const component = {
 
 export default {
     component,
-    id: "waltzPersonSummary"
+    id: "waltzPersonOverview"
 };

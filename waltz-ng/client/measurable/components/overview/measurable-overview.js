@@ -16,12 +16,10 @@
  *
  */
 import _ from "lodash";
-import {enrichServerStats} from "../../../server-info/services/server-utilities";
-import {calcComplexitySummary} from "../../../complexity/services/complexity-utilities";
 import {CORE_API} from "../../../common/services/core-api-utils";
 import {entity} from "../../../common/services/enums/entity";
 import {getEnumName} from "../../../common/services/enums";
-import template from "./measurable-summary.html";
+import template from "./measurable-overview.html";
 import {initialiseData} from "../../../common/index";
 import {findNode, flattenChildren, getParents, populateParents} from "../../../common/hierarchy-utils";
 import {kindToViewState} from "../../../common/link-utils";
@@ -109,24 +107,6 @@ function controller(serviceBroker, $state) {
 
         serviceBroker
             .loadViewData(
-                CORE_API.ServerInfoStore.findStatsForSelector,
-                [selector])
-            .then(r => vm.enrichedServerStats = enrichServerStats(r.data));
-
-        serviceBroker
-            .loadViewData(
-                CORE_API.AssetCostStore.findTotalCostForAppSelector,
-                [selector])
-            .then(r => vm.totalCost = r.data);
-
-        serviceBroker
-            .loadViewData(
-                CORE_API.ComplexityStore.findBySelector,
-                [ selector ])
-            .then(r => vm.complexitySummary = calcComplexitySummary(r.data));
-
-        serviceBroker
-            .loadViewData(
                 CORE_API.MeasurableRelationshipStore.tallyByEntityReference,
                 [ vm.parentEntityRef ])
             .then(r => vm.relationshipStats = prepareRelationshipStats(r.data));
@@ -181,5 +161,5 @@ const component = {
 
 export default {
     component,
-    id: "waltzMeasurableSummary"
+    id: "waltzMeasurableOverview"
 };
